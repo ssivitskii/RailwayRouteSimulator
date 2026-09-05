@@ -36,6 +36,13 @@ public sealed class Route
             IRouteSection section = _sections[index];
             Speed entrySpeed = train.CurrentSpeed;
             SectionPassResult result = section.Pass(train);
+            if (result is SectionPassResult.Success completed
+                && !double.IsFinite(total.Value + completed.Elapsed.Value))
+            {
+                result = new SectionPassResult.CannotMove(
+                    "The route elapsed time exceeded the supported numeric range.");
+            }
+
             trace.Add(CreateTrace(index, section, train, entrySpeed, result));
             if (result is not SectionPassResult.Success success)
             {

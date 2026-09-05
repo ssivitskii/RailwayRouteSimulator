@@ -3,8 +3,10 @@
     <Project Path="src/RailwaySimulator.Domain/RailwaySimulator.Domain.csproj" />
     <Project Path="src/RailwaySimulator.Application/RailwaySimulator.Application.csproj" />
     <Project Path="src/RailwaySimulator.Cli/RailwaySimulator.Cli.csproj" />
+    <Project Path="src/RailwaySimulator.Api/RailwaySimulator.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RailwaySimulator.Tests/RailwaySimulator.Tests.csproj" />
+    <Project Path="tests/RailwaySimulator.ApiTests/RailwaySimulator.ApiTests.csproj" />
   </Folder>
 </Solution>

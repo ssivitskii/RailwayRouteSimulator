@@ -26,7 +26,14 @@ public sealed record Station(Time AlightingTime, Time BoardingTime, Speed EntryS
         if (acceleration is not SectionPassResult.Success accelerationSuccess)
             return acceleration;
 
-        return new SectionPassResult.Success(new Time(
-            elapsed.Value + brakingSuccess.Elapsed.Value + accelerationSuccess.Elapsed.Value));
+        double totalElapsed = elapsed.Value + brakingSuccess.Elapsed.Value;
+        if (!double.IsFinite(totalElapsed))
+            return new SectionPassResult.CannotMove("The station elapsed time exceeded the supported numeric range.");
+
+        totalElapsed += accelerationSuccess.Elapsed.Value;
+        if (!double.IsFinite(totalElapsed))
+            return new SectionPassResult.CannotMove("The station elapsed time exceeded the supported numeric range.");
+
+        return new SectionPassResult.Success(new Time(totalElapsed));
     }
 }

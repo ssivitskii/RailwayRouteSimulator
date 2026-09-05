@@ -68,6 +68,7 @@ public sealed class RouteConfigurationLoader
             IRouteSection[] mappedSections = sections.Select(MapSection).ToArray();
             var route = new Route(mappedSections, new Speed(endSpeedLimit));
             RouteSectionPlan[] sectionPlans = mappedSections.Select(MapPlan).ToArray();
+            ValidatePlanAggregates(sectionPlans);
             return new SimulationScenario(train, route, new RoutePlan(initialSpeed, endSpeedLimit, sectionPlans));
         }
         catch (ArgumentOutOfRangeException exception)
@@ -92,10 +93,7 @@ public sealed class RouteConfigurationLoader
                 "powered" => new PoweredTrack(
                     new Distance(Require(section.Distance, "distance", index)),
                     new Force(Require(section.Force, "force", index))),
-                "station" => new Station(
-                    new Time(Require(section.AlightingTime, "alightingTime", index)),
-                    new Time(Require(section.BoardingTime, "boardingTime", index)),
-                    new Speed(Require(section.SpeedLimit, "speedLimit", index))),
+                "station" => MapStation(section, index),
                 _ => throw new RouteConfigurationException($"Section {index}: unknown type '{section.Type}'."),
             };
         }
@@ -103,6 +101,28 @@ public sealed class RouteConfigurationLoader
         {
             throw new RouteConfigurationException($"Section {index}: {exception.Message}", exception);
         }
+    }
+
+    private static Station MapStation(RouteConfiguration.SectionConfiguration section, int index)
+    {
+        double alightingTime = Require(section.AlightingTime, "alightingTime", index);
+        double boardingTime = Require(section.BoardingTime, "boardingTime", index);
+        if (!double.IsFinite(alightingTime + boardingTime))
+            throw new RouteConfigurationException($"Section {index}: combined station wait must be finite.");
+
+        return new Station(
+            new Time(alightingTime),
+            new Time(boardingTime),
+            new Speed(Require(section.SpeedLimit, "speedLimit", index)));
+    }
+
+    private static void ValidatePlanAggregates(IEnumerable<RouteSectionPlan> sections)
+    {
+        RouteSectionPlan[] plans = sections.ToArray();
+        if (!double.IsFinite(plans.Sum(section => section.PlannedDistance ?? 0)))
+            throw new RouteConfigurationException("The total planned track distance must be finite.");
+        if (!double.IsFinite(plans.Sum(section => section.ConfiguredStationWait)))
+            throw new RouteConfigurationException("The total configured station wait must be finite.");
     }
 
     private static RouteSectionPlan MapPlan(IRouteSection section, int index)

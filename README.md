@@ -1,6 +1,6 @@
 # Railway Route Simulator
 
-A deterministic .NET command-line simulator for train movement across powered tracks, unpowered tracks, and stations. It preserves a small physics-focused domain model while accepting practical JSON route definitions.
+A deterministic .NET simulator for train movement across powered tracks, unpowered tracks, and stations, available through a CLI and an interactive Angular engineering console. It preserves a small physics-focused domain model while accepting practical JSON route definitions.
 
 ## Features
 
@@ -11,31 +11,63 @@ A deterministic .NET command-line simulator for train movement across powered tr
 - Analyzes a shared execution trace with elapsed/moving time, configured and executed station wait, planned distance, sampled speeds, modeled acceleration, evaluated safety margins, and an explicitly labeled tightest-constraint heuristic.
 - Compares two or more route files with a documented stable ranking policy.
 - Optimizes the configured initial speed over a bounded deterministic grid, rebuilding the scenario for every candidate.
+- Exposes route analysis through a small ASP.NET Core API without duplicating physics in the browser.
+- Provides an editable route builder, trace playback, speed profile, metrics, and accessible section table.
 
 ## Tech Stack
 
-C# · .NET 9 · System.Text.Json · xUnit
+C# · .NET 9 · ASP.NET Core · System.Text.Json · xUnit · Angular 22 · TypeScript · Vitest
 
 ## Architecture
 
-`RailwaySimulator.Domain` contains the physics model, value objects, route sections, explicit result types, and section-by-section execution trace. `RailwaySimulator.Application` maps external configuration into fresh domain scenarios and derives analysis, comparison, and optimization reports from that trace. `RailwaySimulator.Cli` owns file I/O, argument validation, and deterministic output formatting.
+`RailwaySimulator.Domain` contains the physics model, value objects, route sections, explicit result types, and section-by-section execution trace. `RailwaySimulator.Application` maps external configuration into fresh domain scenarios and derives analysis, comparison, and optimization reports from that trace. `RailwaySimulator.Cli` owns file I/O, argument validation, and deterministic output formatting. `RailwaySimulator.Api` maps HTTP JSON directly through the same application service. `frontend` renders only API results: its animation and SVG interpolation are presentation concerns, never an alternative physics engine.
 
 ## Project Structure
 
 - `src/RailwaySimulator.Domain` — train, route, sections, value objects, results.
 - `src/RailwaySimulator.Application` — JSON configuration mapping and simulation reports.
 - `src/RailwaySimulator.Cli` — executable entry point.
+- `src/RailwaySimulator.Api` — HTTP analysis endpoint, health check, and development Swagger UI.
 - `tests/RailwaySimulator.Tests` — domain, boundary, configuration, and CLI tests.
+- `tests/RailwaySimulator.ApiTests` — in-memory HTTP contract tests.
+- `frontend` — standalone strict Angular application and unit tests.
 - `examples` — ready-to-run configurations.
 
 ## Getting Started
 
-Requires the .NET 9 SDK.
+Requires the .NET 9 SDK. The interactive UI additionally requires a current Node.js release supported by Angular 22 and npm.
+
+## Interactive UI
+
+Run the API and UI in two terminals from the repository root:
+
+```bash
+ASPNETCORE_URLS=http://localhost:8080 dotnet run --project src/RailwaySimulator.Api
+```
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Open `http://localhost:4200`. The Angular development server proxies `/api` and `/health` to `http://localhost:8080`, so the API does not need a broad CORS policy.
+
+The screen includes two repository-example presets, train inputs, a dynamic powered/normal/station section editor, API validation feedback, deterministic trace playback with station holds, an SVG speed profile, KPI cards, and a horizontally scrollable trace table.
+
+## HTTP API
+
+`POST /api/simulations/analyze` accepts the same JSON shape used by files in `examples` and returns a camel-case `SimulationAnalysis` with `report`, `metrics`, and `trace`. It never accepts a server-side file path or launches the CLI.
+
+`GET /health/live` is a process liveness endpoint. In development, Swagger UI is available at `/swagger`.
+
+The HTTP boundary limits request bodies to 128 KiB, routes to 64 sections, and fixed-step precision to at least `0.001` seconds. The domain continues to validate physical values and rejects non-finite intermediate arithmetic. Each train has one shared one-million-step integration budget across every section and station maneuver, so route length cannot multiply the CPU ceiling. The analyze endpoint permits four concurrent simulations with no queue and returns HTTP 429 when capacity is occupied; health and Swagger endpoints are not rate-limited. Error responses use `application/problem+json`; unexpected exception details are not exposed.
 
 ## Build
 
 ```bash
 dotnet build RailwayRouteSimulator.slnx -c Release
+npm --prefix frontend run build
 ```
 
 ## Run
@@ -68,6 +100,8 @@ Every command accepts `--format text|json|csv`; `--json` remains an alias for `-
 
 ```bash
 dotnet test RailwayRouteSimulator.slnx -c Release
+npm --prefix frontend test
+npm --prefix frontend run format:check
 ```
 
 ## Examples
@@ -86,4 +120,4 @@ Comparison ranks successful routes above failed routes. Within each result group
 
 ## Limitations / Future Improvements
 
-The model uses fixed time steps and intentionally omits track gradients, drag, and multi-train scheduling. Those features should only be introduced together with clear physical assumptions and regression scenarios.
+The model uses fixed time steps and intentionally omits track gradients, drag, and multi-train scheduling. Those features should only be introduced together with clear physical assumptions and regression scenarios. A simulation is synchronously CPU-bound and does not currently accept mid-run cancellation; the shared work budget and endpoint concurrency limiter provide deterministic resource ceilings instead.

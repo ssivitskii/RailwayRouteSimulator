@@ -101,7 +101,7 @@ public sealed class RouteSimulationService
             executedWait,
             plannedDistance,
             report.Succeeded ? plannedDistance : null,
-            sampledSpeeds.Average(),
+            CalculateMean(sampledSpeeds),
             sampledSpeeds.Max(),
             sampledSpeeds.Min(),
             modeledAccelerations.Length == 0 ? null : modeledAccelerations.Max(),
@@ -109,6 +109,19 @@ public sealed class RouteSimulationService
             scenario.SectionCount,
             scenario.Plan.Sections.Count(section => section.Kind == RouteSectionKind.Station),
             tightestConstraint);
+    }
+
+    private static double CalculateMean(IReadOnlyCollection<double> values)
+    {
+        double mean = 0;
+        int count = 0;
+        foreach (double value in values)
+        {
+            count++;
+            mean += (value - mean) / count;
+        }
+
+        return mean;
     }
 
     private static string FindFallbackConstraint(

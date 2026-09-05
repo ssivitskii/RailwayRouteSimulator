@@ -1,0 +1,382 @@
+<header class="topbar">
+  <a class="brand" href="#top" aria-label="Railway Dynamics home">
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M10 36 19 7h10l9 29M15 25h18M12 33h24M17 40l14-36M31 40 17-36" />
+    </svg>
+    <span><strong>Railway</strong> Dynamics Lab</span>
+  </a>
+  <span class="system-state"><i></i> Deterministic server analysis</span>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Route engineering console · .NET 9 + Angular 22</p>
+      <h1>Shape the route.<br /><em>Watch the physics.</em></h1>
+      <p class="lede">
+        Configure a train and line sections, then inspect the server-computed motion trace. The
+        browser visualizes results; the .NET domain remains the single source of physical truth.
+      </p>
+    </div>
+    <div class="hero-stat" aria-label="Simulation limits">
+      <span>API SAFETY ENVELOPE</span><strong>{{ maximumSections }}</strong
+      ><small>sections maximum</small>
+    </div>
+  </section>
+
+  <div class="workspace">
+    <section class="panel configurator" aria-labelledby="configuration-heading">
+      <div class="panel-heading">
+        <div>
+          <p class="step">01 · INPUT</p>
+          <h2 id="configuration-heading">Configuration</h2>
+        </div>
+        <span class="edit-state">Editable</span>
+      </div>
+
+      <div class="preset-grid" aria-label="Example routes">
+        @for (preset of presets; track preset.name; let index = $index) {
+          <button type="button" class="preset" (click)="applyPreset(index)">
+            <strong>{{ preset.name }}</strong
+            ><span>{{ preset.description }}</span>
+          </button>
+        }
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="runSimulation()">
+        <fieldset>
+          <legend>Train envelope</legend>
+          <div class="field-grid">
+            <label
+              >Mass <span>kg</span
+              ><input type="number" formControlName="mass" min="0.001" step="100"
+            /></label>
+            <label
+              >Max force <span>N</span
+              ><input type="number" formControlName="maximumForce" min="0" step="100"
+            /></label>
+            <label
+              >Precision <span>s</span
+              ><input type="number" formControlName="precision" min="0.001" step="0.01"
+            /></label>
+            <label
+              >Initial speed <span>m/s</span
+              ><input type="number" formControlName="initialSpeed" min="0" step="0.5"
+            /></label>
+            <label
+              >Final limit <span>m/s</span
+              ><input type="number" formControlName="endSpeedLimit" min="0" step="0.5"
+            /></label>
+          </div>
+          @if (form.touched && (form.controls.mass.invalid || form.controls.precision.invalid)) {
+            <p class="field-error">Mass must be positive and precision must be at least 0.001 s.</p>
+          }
+          @if (
+            form.touched &&
+            (form.controls.maximumForce.invalid ||
+              form.controls.initialSpeed.invalid ||
+              form.controls.endSpeedLimit.invalid)
+          ) {
+            <p class="field-error">
+              Maximum force, initial speed, and final speed limit must be zero or greater.
+            </p>
+          }
+        </fieldset>
+
+        <fieldset formArrayName="sections">
+          <div class="legend-row">
+            <legend>Route sections</legend>
+            <span>{{ sectionControls.length }} / {{ maximumSections }}</span>
+          </div>
+          <div class="section-list">
+            @for (section of sectionControls; track section; let index = $index) {
+              <article class="section-card" [formGroupName]="index">
+                <div class="section-index">{{ (index + 1).toString().padStart(2, '0') }}</div>
+                <div class="section-body">
+                  <label class="type-field">
+                    Section type
+                    <select formControlName="type" (change)="sectionTypeChanged(section)">
+                      <option value="powered">Powered track</option>
+                      <option value="normal">Normal track</option>
+                      <option value="station">Station</option>
+                    </select>
+                  </label>
+                  <div class="section-fields">
+                    @if (section.controls.type.value !== 'station') {
+                      <label
+                        >Distance <span>m</span
+                        ><input type="number" formControlName="distance" min="0.001"
+                      /></label>
+                    }
+                    @if (section.controls.type.value === 'powered') {
+                      <label
+                        >Applied force <span>N</span><input type="number" formControlName="force"
+                      /></label>
+                    }
+                    @if (section.controls.type.value === 'station') {
+                      <label
+                        >Alighting <span>s</span
+                        ><input type="number" formControlName="alightingTime" min="0"
+                      /></label>
+                      <label
+                        >Boarding <span>s</span
+                        ><input type="number" formControlName="boardingTime" min="0"
+                      /></label>
+                      <label
+                        >Entry limit <span>m/s</span
+                        ><input type="number" formControlName="speedLimit" min="0"
+                      /></label>
+                    }
+                  </div>
+                  @if (section.touched && section.invalid) {
+                    <p class="field-error">Complete the required values for this section.</p>
+                  }
+                </div>
+                <div class="section-actions">
+                  <button
+                    type="button"
+                    aria-label="Move section up"
+                    title="Move section up"
+                    [disabled]="index === 0"
+                    (click)="moveSection(index, -1)"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Move section down"
+                    title="Move section down"
+                    [disabled]="index === sectionControls.length - 1"
+                    (click)="moveSection(index, 1)"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remove section"
+                    title="Remove section"
+                    [disabled]="sectionControls.length === 1"
+                    (click)="removeSection(index)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </article>
+            }
+          </div>
+          <div class="add-row">
+            <button
+              type="button"
+              (click)="addSection('powered')"
+              [disabled]="sectionControls.length >= maximumSections"
+            >
+              + Powered
+            </button>
+            <button
+              type="button"
+              (click)="addSection('normal')"
+              [disabled]="sectionControls.length >= maximumSections"
+            >
+              + Normal
+            </button>
+            <button
+              type="button"
+              (click)="addSection('station')"
+              [disabled]="sectionControls.length >= maximumSections"
+            >
+              + Station
+            </button>
+          </div>
+        </fieldset>
+
+        <button class="run-button" type="submit" [disabled]="state() === 'loading'">
+          @if (state() === 'loading') {
+            <span class="spinner"></span> Analyzing route…
+          } @else {
+            Run simulation <span>→</span>
+          }
+        </button>
+      </form>
+    </section>
+
+    <section class="panel results" aria-labelledby="results-heading" aria-live="polite">
+      <div class="panel-heading">
+        <div>
+          <p class="step">02 · OUTPUT</p>
+          <h2 id="results-heading">Motion analysis</h2>
+        </div>
+        @if (state() === 'success') {
+          <span class="result-badge success">Passed</span>
+        }
+        @if (state() === 'failure') {
+          <span class="result-badge failure">Attention</span>
+        }
+      </div>
+
+      @if (state() === 'idle') {
+        <div class="empty-state">
+          <svg viewBox="0 0 180 100" aria-hidden="true">
+            <path d="M5 80h170M15 73 40 35h43l25 38M44 35l20-22 16 22M116 73l20-28 28 28" />
+            <circle cx="40" cy="80" r="5" />
+            <circle cx="140" cy="80" r="5" />
+          </svg>
+          <h3>Your route is on the drafting table</h3>
+          <p>Choose a preset or edit the line, then run the server simulation.</p>
+        </div>
+      } @else if (state() === 'loading') {
+        <div class="empty-state">
+          <span class="loader-rail"></span>
+          <h3>Integrating motion steps</h3>
+          <p>The .NET engine is evaluating every route section.</p>
+        </div>
+      } @else if (errorMessage()) {
+        <div class="error-state">
+          <span>!</span>
+          <div>
+            <h3>Could not analyze this route</h3>
+            <p>{{ errorMessage() }}</p>
+          </div>
+        </div>
+      } @else if (analysis(); as result) {
+        <div class="summary-strip" [class.failed]="!result.report.succeeded">
+          <span>{{ result.report.succeeded ? '✓' : '!' }}</span>
+          <div>
+            <strong>{{ result.report.summary }}</strong
+            ><small>{{ result.metrics.tightestConstraint }}</small>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <article>
+            <span>Elapsed time</span><strong>{{ format(result.report.elapsedTime) }}</strong
+            ><small>seconds</small>
+          </article>
+          <article>
+            <span>Final speed</span><strong>{{ format(result.report.finalSpeed) }}</strong
+            ><small>m/s</small>
+          </article>
+          <article>
+            <span>Track distance</span
+            ><strong>{{ format(result.metrics.plannedTrackDistance, 1) }}</strong
+            ><small>meters planned</small>
+          </article>
+          <article>
+            <span>Peak acceleration</span
+            ><strong>{{ format(result.metrics.maximumModeledAcceleration, 3) }}</strong
+            ><small>m/s² modeled</small>
+          </article>
+        </div>
+
+        <section class="visual-card" aria-labelledby="route-map-heading">
+          <div class="visual-heading">
+            <div>
+              <span>LIVE TRACE</span>
+              <h3 id="route-map-heading">Route playback</h3>
+            </div>
+            <strong
+              >{{ format(playbackSeconds(), 1) }} / {{ format(playbackDuration(), 1) }} s</strong
+            >
+          </div>
+          <div class="route-map">
+            <div class="track-line"></div>
+            <div class="train-marker" [style.left.%]="playbackProgress()" aria-hidden="true">
+              <span></span>
+            </div>
+            <div class="segments">
+              @for (section of lastRunConfiguration()?.sections ?? []; track $index) {
+                <div [class]="'segment ' + section.type" [style.flex-grow]="segmentWeight(section)">
+                  <i></i><span>{{ section.type === 'station' ? 'STN' : $index + 1 }}</span>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="playback-controls">
+            <button type="button" (click)="isPlaying() ? pause() : play()">
+              {{ isPlaying() ? 'Pause' : 'Play' }}
+            </button>
+            <button type="button" class="quiet" (click)="resetPlayback()">Reset</button>
+            <input
+              type="range"
+              aria-label="Simulation timeline"
+              min="0"
+              [max]="playbackDuration()"
+              step="0.1"
+              [value]="playbackSeconds()"
+              (input)="scrub($event)"
+            /><span>8×</span>
+          </div>
+        </section>
+
+        <section class="visual-card speed-chart" aria-labelledby="speed-heading">
+          <div class="visual-heading">
+            <div>
+              <span>SERVER SAMPLES</span>
+              <h3 id="speed-heading">Speed profile</h3>
+            </div>
+            <strong>max {{ format(result.metrics.maximumSampledSpeed) }} m/s</strong>
+          </div>
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Speed samples across route sections"
+          >
+            <defs>
+              <linearGradient id="speedFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f5a623" stop-opacity=".45" />
+                <stop offset="1" stop-color="#f5a623" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path class="grid" d="M8 20h84M8 54h84M8 88h84" />
+            <polyline
+              class="speed-area"
+              [attr.points]="'8,88 ' + speedProfilePoints() + ' 92,88'"
+            />
+            <polyline class="speed-line" [attr.points]="speedProfilePoints()" />
+          </svg>
+        </section>
+
+        <section class="trace-section" aria-labelledby="trace-heading">
+          <div class="visual-heading">
+            <div>
+              <span>SECTION LOG</span>
+              <h3 id="trace-heading">Execution trace</h3>
+            </div>
+            <strong>{{ result.trace.length }} records</strong>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Section</th>
+                  <th>Entry</th>
+                  <th>Exit</th>
+                  <th>Time</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (section of result.trace; track section.index) {
+                  <tr [class.failed-row]="!section.succeeded">
+                    <td>{{ section.index + 1 }}</td>
+                    <td>{{ section.type }}</td>
+                    <td>{{ format(section.entrySpeed) }} m/s</td>
+                    <td>{{ format(section.exitSpeed) }} m/s</td>
+                    <td>{{ format(section.elapsedTime) }} s</td>
+                    <td><span class="status-dot"></span>{{ section.result }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    </section>
+  </div>
+</main>
+
+<footer>
+  <span>RAILWAY DYNAMICS LAB</span
+  ><span>Fixed-step deterministic simulation · API limit 128 KiB</span>
+</footer>
