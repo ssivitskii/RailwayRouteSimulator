@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../RailwaySimulator.Domain/RailwaySimulator.Domain.csproj" />
+  </ItemGroup>
+</Project>

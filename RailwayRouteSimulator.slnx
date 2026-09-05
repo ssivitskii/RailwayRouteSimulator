@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RailwaySimulator.Domain/RailwaySimulator.Domain.csproj" />
+    <Project Path="src/RailwaySimulator.Application/RailwaySimulator.Application.csproj" />
+    <Project Path="src/RailwaySimulator.Cli/RailwaySimulator.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RailwaySimulator.Tests/RailwaySimulator.Tests.csproj" />
+  </Folder>
+</Solution>

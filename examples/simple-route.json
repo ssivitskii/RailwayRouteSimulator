@@ -1,0 +1,13 @@
+{
+  "train": {
+    "mass": 1000,
+    "maximumForce": 2000,
+    "precision": 0.1,
+    "initialSpeed": 0
+  },
+  "endSpeedLimit": 6,
+  "sections": [
+    { "type": "powered", "distance": 20, "force": 500 },
+    { "type": "normal", "distance": 10 }
+  ]
+}
